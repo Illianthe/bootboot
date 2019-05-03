@@ -30,6 +30,8 @@ module Bootboot
       self.class.hook("after-install-all") do
         current_definition = Bundler.definition
 
+        Bundler.ui.confirm("Test")
+
         next if !GEMFILE_NEXT_LOCK.exist? ||
                 nothing_changed?(current_definition) ||
                 ENV[Bootboot.env_next] ||
