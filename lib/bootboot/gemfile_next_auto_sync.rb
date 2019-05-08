@@ -3,6 +3,7 @@
 module Bootboot
   class GemfileNextAutoSync < Bundler::Plugin::API
     def setup
+      return if ENV['SKIP_BUNDLER_AUTOSYNC']
       check_bundler_version
       opt_in
     end
@@ -14,7 +15,7 @@ module Bootboot
         next if Bundler::VERSION >= "1.17.0" || !GEMFILE_NEXT_LOCK.exist?
 
         Bundler.ui.warn(<<-EOM.gsub(/\s+/, " "))
-          Bootboot can't automatically update the Gemfile_next.lock because you are running
+          Bootboot can't automatically sync your Gemfiles because you are running
           an older version of Bundler.
 
           Update Bundler to 1.17.0 to discard this warning.
@@ -29,21 +30,15 @@ module Bootboot
 
       self.class.hook("after-install-all") do
         current_definition = Bundler.definition
-
-        next if !GEMFILE_NEXT_LOCK.exist? ||
-                nothing_changed?(current_definition) ||
-                ENV[Bootboot.env_next] ||
-                ENV[Bootboot.env_previous]
-
+        next unless GEMFILE_NEXT_LOCK.exist?
         update!(current_definition)
       end
     end
 
-    def nothing_changed?(current_definition)
-      current_definition.to_lock == @previous_lock
-    end
-
     def update!(current_definition)
+      last_env_previous = ENV.delete(Bootboot.env_previous)
+      last_env_next = ENV.delete(Bootboot.env_next)
+
       env = which_env
       lock = which_lock
 
@@ -58,6 +53,8 @@ module Bootboot
     ensure
       ENV.delete(env)
       ENV.delete('SKIP_BUNDLER_PATCH')
+      ENV[Bootboot.env_previous] = last_env_previous unless last_env_previous.nil?
+      ENV[Bootboot.env_next] = last_env_next unless last_env_next.nil?
     end
 
     def which_env
